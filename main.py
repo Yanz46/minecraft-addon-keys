@@ -1,17 +1,27 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware  # <-- Tambahkan ini
 import pandas as pd
 import os
 
 app = FastAPI(title="Minecraft Addon Keys API")
 
+# ---- ATURAN CORS (IZIN AKSES) ----
+# Kode ini memberi tahu browser bahwa website apa pun boleh mengakses API ini
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # "*" artinya mengizinkan semua domain termasuk github.io Anda
+    allow_credentials=True,
+    allow_methods=["*"],  # Mengizinkan semua metode (GET, POST, dll)
+    allow_headers=["*"],  # Mengizinkan semua header
+)
+# ----------------------------------
+
 # Fungsi untuk membaca data dari file keys.tsv
 def load_data():
-    # Mengetahui lokasi file keys.tsv yang berada di folder yang sama dengan main.py
     current_dir = os.path.dirname(os.path.abspath(__file__))
     file_path = os.path.join(current_dir, "keys.tsv")
     
     try:
-        # Membaca file TSV (Tab-Separated Values)
         df = pd.read_csv(file_path, sep="\t")
         return df
     except Exception as e:
@@ -32,38 +42,28 @@ def get_all_keys():
     df = load_data()
     if df is None:
         raise HTTPException(status_code=500, detail="Gagal memuat data dari file keys.tsv")
-    
-    # Mengubah isi tsv menjadi format JSON (List of Dictionary)
     return df.to_dict(orient="records")
 
 # Endpoint 2: Mencari key berdasarkan MarketUUID
-# Contoh: /keys/001ea2b9-3821-466c-b144-0edb9d07d42c
 @app.get("/keys/{market_uuid}")
 def get_key_by_market_uuid(market_uuid: str):
     df = load_data()
     if df is None:
         raise HTTPException(status_code=500, detail="Gagal memuat data")
     
-    # Filter mencari yang MarketUUID-nya cocok
     result = df[df['MarketUUID'] == market_uuid]
-    
     if result.empty:
         raise HTTPException(status_code=404, detail="MarketUUID tidak ditemukan")
-    
-    # Mengembalikan 1 data yang cocok dalam bentuk JSON object
     return result.to_dict(orient="records")[0]
 
-# Endpoint 3: Memfilter berdasarkan TypePack (contoh: world_template)
-# Contoh penggunaan: /keys/filter/type?type_pack=world_template
+# Endpoint 3: Memfilter berdasarkan TypePack
 @app.get("/keys/filter/type")
 def filter_by_type(type_pack: str):
     df = load_data()
     if df is None:
         raise HTTPException(status_code=500, detail="Gagal memuat data")
     
-    # Filter berdasarkan TypePack (ignore huruf besar/kecil)
     result = df[df['TypePack'].str.lower() == type_pack.lower()]
-    
     if result.empty:
         return {"message": f"Tidak ada data dengan TypePack: {type_pack}", "data": []}
         
