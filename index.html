@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft DLC Database Viewer</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            max-width: 700px;
+            width: 100%;
+            background: #1e1e1e;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        h2 { text-align: center; color: #4caf50; margin-top: 0; }
+        .setup-box {
+            background: #2d2d2d;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border: 1px dashed #4caf50;
+        }
+        input[type="text"], button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            border-radius: 4px;
+            border: none;
+            box-sizing: border-box;
+        }
+        input[type="text"] { background: #333; color: white; border: 1px solid #555; }
+        button {
+            background: #4caf50;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover { background: #45a049; }
+        .status {
+            font-size: 14px;
+            color: #ff9800;
+            margin-top: 5px;
+            text-align: center;
+        }
+        .result-box {
+            margin-top: 20px;
+            padding: 15px;
+            background: #2d2d2d;
+            border-left: 5px solid #00bcd4;
+            border-radius: 4px;
+            display: none;
+        }
+        .error { border-left-color: #f44336; color: #ff5252; }
+        span.value { color: #ffeb3b; font-family: monospace; font-size: 15px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Minecraft Key Database Finder</h2>
+    
+    <div class="setup-box">
+        <label style="font-weight: bold; display: block; margin-bottom: 5px;">Langkah 1: Masukkan Database</label>
+        <p style="margin: 0 0 10px 0; font-size: 13px; color: #aaa;">Pilih file <strong>keys.tsv</strong> yang Anda ekstrak dari file zip.</p>
+        <input type="file" id="tsvFile" accept=".tsv,.txt" style="color: white;">
+        <div id="loadStatus" class="status">Database belum dimuat.</div>
+    </div>
+
+    <div id="searchSection" style="opacity: 0.5; pointer-events: none;">
+        <label style="font-weight: bold;">Langkah 2: Cari Key</label>
+        <input type="text" id="uuidInput" placeholder="Masukkan Market UUID (Contoh: 000ed90d-...)">
+        <button onclick="cariData()">Cari Sekarang</button>
+    </div>
+
+    <div id="result" class="result-box">
+        <p><strong>Market UUID:</strong> <br><span id="resMarket" class="value"></span></p>
+        <p><strong>Manifest UUID:</strong> <br><span id="resManifest" class="value"></span></p>
+        <p><strong>Tipe Pack:</strong> <br><span id="resType" class="value"></span></p>
+        <p><strong>AES Key:</strong> <br><span id="resKey" style="color: #69f0ae; font-family: monospace; font-size: 16px; font-weight: bold;"></span></p>
+    </div>
+    
+    <div id="error" class="result-box error">
+        <strong>Pencarian Gagal:</strong> UUID tidak ditemukan di dalam file keys.tsv yang Anda upload.
+    </div>
+</div>
+
+<script>
+let databaseKeys = {}; // Tempat menampung data setelah TSV dibaca
+
+// Fungsi membaca file TSV saat user memilih file
+document.getElementById('tsvFile').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const text = e.target.result;
+        const lines = text.split(/\r?\n/);
+        databaseKeys = {}; // Reset data lama
+        let count = 0;
+
+        // Looping setiap baris data di file keys.tsv
+        for (let i = 1; i < lines.length; i++) {
+            const row = lines[i].split('\t'); // Pisahkan berdasarkan Tab (\t)
+            if (row.length >= 4) {
+                const marketUUID = row[0].trim().toLowerCase();
+                databaseKeys[marketUUID] = {
+                    manifest: row[1].trim(),
+                    type: row[2].trim(),
+                    key: row[3].trim()
+                };
+                count++;
+            }
+        }
+
+        if (count > 0) {
+            document.getElementById('loadStatus').innerText = `✅ Berhasil memuat ${count} data dari file keys.tsv!`;
+            document.getElementById('loadStatus').style.color = '#4caf50';
+            // Aktifkan kolom pencarian
+            document.getElementById('searchSection').style.opacity = '1';
+            document.getElementById('searchSection').style.pointer-events = 'auto';
+        } else {
+            document.getElementById('loadStatus').innerText = "❌ File kosong atau format tidak sesuai.";
+            document.getElementById('loadStatus').style.color = '#f44336';
+        }
+    };
+    reader.readAsText(file);
+});
+
+// Fungsi tombol Cari
+function cariData() {
+    const uuid = document.getElementById("uuidInput").value.trim().toLowerCase();
+    const resultBox = document.getElementById("result");
+    const errorBox = document.getElementById("error");
+
+    resultBox.style.display = "none";
+    errorBox.style.display = "none";
+
+    if (databaseKeys[uuid]) {
+        document.getElementById("resMarket").innerText = uuid;
+        document.getElementById("resManifest").innerText = databaseKeys[uuid].manifest;
+        document.getElementById("resType").innerText = databaseKeys[uuid].type;
+        document.getElementById("resKey").innerText = databaseKeys[uuid].key;
+        resultBox.style.display = "block";
+    } else {
+        errorBox.style.display = "block";
+    }
+}
+</script>
+
+</body>
+</html>
